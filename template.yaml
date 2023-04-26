@@ -2,32 +2,6 @@ AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: The infrastructure template for Terraform Engine
 
-Conditions:
-  MoreThan2AZs:
-    Fn::And:
-    - { Condition: MoreThan1AZ }
-    - Fn::Or:
-      - Fn::Equals:
-        - { Ref: 'AWS::Region' }
-        - us-east-1
-      - Fn::Equals:
-        - { Ref: 'AWS::Region' }
-        - us-west-2
-      - Fn::Equals:
-        - { Ref: 'AWS::Region' }
-        - eu-west-1
-      - Fn::Equals:
-        - { Ref: 'AWS::Region' }
-        - ap-southeast-2
-      - Fn::Equals:
-        - { Ref: 'RIPMoreThan2AZsParameter' }
-        - 'true'
-
-  MoreThan1AZ:
-    Fn::Equals:
-    - { Ref: 'RIPMoreThan1AZParameter' }
-    - 'true'
-
 Parameters:
   ServiceCatalogEndpoint:
     Default: ""
@@ -51,37 +25,7 @@ Parameters:
     Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
     Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
 
-  VpcCidr:
-    Default: 10.0.0.0/16
-    Description: Please enter the IP range (CIDR notation) for this VPC
-    Type: String
-
-  PublicSubnet1CIDR:
-    Default: 10.0.0.0/19
-    Description: Please enter the IP range (CIDR notation) for the public subnet 1
-    Type: String
-
-  PublicSubnet2CIDR:
-    Default: 10.0.64.0/19
-    Description: Please enter the IP range (CIDR notation) for the public subnet 2
-    Type: String
-
-  PublicSubnet3CIDR:
-    Default: 10.0.128.0/19
-    Description: Please enter the IP range (CIDR notation) for the public subnet 3 (not supported in all regions)
-    Type: String
-
-  PrivateSubnet1CIDR:
-    Default: 10.0.32.0/19
-    Description: Please enter the IP range (CIDR notation) for the private subnet 1
-    Type: String
-
-  PrivateSubnet2CIDR:
-    Default: 10.0.96.0/19
-    Description: Please enter the IP range (CIDR notation) for the private subnet 2
-    Type: String
-
-  PrivateSubnet3CIDR:
+  
     Default: 10.0.160.0/19
     Description: Please enter the IP range (CIDR notation) for the private subnet 3 (not supported in all regions)
     Type: String
@@ -95,14 +39,7 @@ Parameters:
     MinLength: 9
     Type: String
 
-  RIPMoreThan2AZsParameter:
-    Default: 'false'
-    Type: String
-    AllowedValues:
-      - 'true'
-      - 'false'
-
-  RIPMoreThan1AZParameter:
+  
     Default: 'true'
     Type: String
     AllowedValues:
@@ -115,272 +52,16 @@ Parameters:
     Type: Number
     MinValue: 128
     MaxValue: 10240
+  
 
 Resources:
-  # VPC for Terraform Reference Engine
-  VPC:
-    Type: AWS::EC2::VPC
-    Properties:
-      CidrBlock: !Ref VpcCidr
-      EnableDnsHostnames: True
-      EnableDnsSupport: True
-      InstanceTenancy: default
-      Tags:
-        - Key: Name
-          Value: TerraformEngineVpc
-
-  InternetGateway:
-    Type: AWS::EC2::InternetGateway
-    Properties:
-      Tags:
-        - Key: Name
-          Value: TerraformEngineInternetGateway
-
-  InternetGatewayAttachment:
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties:
-      InternetGatewayId: !Ref InternetGateway
-      VpcId: !Ref VPC
-
-  NatGatewayFromPublicSubnet1:
-    Type: 'AWS::EC2::NatGateway'
-    Properties:
-      Tags:
-        - Key: Name
-          Value: TerraformEngineNatGateway1
-      AllocationId: !GetAtt 'ElasticIPAddress1.AllocationId'
-      SubnetId: !Ref PublicSubnet1
-      
-  NatGatewayFromPublicSubnet2:
-    Condition: MoreThan1AZ
-    Type: 'AWS::EC2::NatGateway'
-    Properties:
-      Tags:
-        - Key: Name
-          Value: TerraformEngineNatGateway2
-      AllocationId: !GetAtt 'ElasticIPAddress2.AllocationId'
-      SubnetId: !Ref PublicSubnet2
-  
-  NatGatewayFromPublicSubnet3:
-    Condition: MoreThan2AZs
-    Type: 'AWS::EC2::NatGateway'
-    Properties:
-      Tags:
-        - Key: Name
-          Value: TerraformEngineNatGateway3
-      AllocationId: !GetAtt 'ElasticIPAddress3.AllocationId'
-      SubnetId: !Ref PublicSubnet3
-  
-  ElasticIPAddress1:
-    Type: 'AWS::EC2::EIP'
-    Properties:
-      Domain: vpc
-  
-  ElasticIPAddress2:
-    Condition: MoreThan1AZ
-    Type: 'AWS::EC2::EIP'
-    Properties:
-      Domain: vpc
-      
-  ElasticIPAddress3:
-    Condition: MoreThan2AZs
-    Type: 'AWS::EC2::EIP'
-    Properties:
-      Domain: vpc
-       
-  # Create Public Subnets
-  PublicSubnet1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      AvailabilityZone: !Select [ 0, !GetAZs '' ]
-      CidrBlock: !Ref PublicSubnet1CIDR
-      MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: TerraformEnginePublicSubnet1
-      VpcId: !Ref VPC
-
-  PublicSubnet2:
-    Condition: MoreThan1AZ
-    Type: AWS::EC2::Subnet
-    Properties:
-      AvailabilityZone: !Select [ 1, !GetAZs '' ]
-      CidrBlock: !Ref PublicSubnet2CIDR
-      MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: TerraformEnginePublicSubnet2
-      VpcId: !Ref VPC
-
-  PublicSubnet3:
-    Condition: MoreThan2AZs
-    Type: AWS::EC2::Subnet
-    Properties:
-      AvailabilityZone: !Select [ 2, !GetAZs '' ]
-      CidrBlock: !Ref PublicSubnet3CIDR
-      MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: TerraformEnginePublicSubnet3
-      VpcId: !Ref VPC
-
-  # Create Public Route Table
-  PublicRouteTable:
-    Type: AWS::EC2::RouteTable
-    DependsOn:
-      - InternetGateway
-      - InternetGatewayAttachment
-    Properties:
-      Tags:
-        - Key: Name
-          Value: TerraformEnginePublicRouteTable
-      VpcId: !Ref VPC
-
-  PublicRoute:
-    Type: AWS::EC2::Route
-    DependsOn:
-      - InternetGateway
-      - InternetGatewayAttachment
-    Properties:
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref InternetGateway
-      RouteTableId: !Ref PublicRouteTable
-
-  # Associate Public Subnets
-  PublicSubnet1RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref PublicRouteTable
-      SubnetId: !Ref PublicSubnet1
-
-  PublicSubnet2RouteTableAssociation:
-    Condition: MoreThan1AZ
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref PublicRouteTable
-      SubnetId: !Ref PublicSubnet2
-
-  PublicSubnet3RouteTableAssociation:
-    Condition: MoreThan2AZs
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref PublicRouteTable
-      SubnetId: !Ref PublicSubnet3
-
-  # Create Private Subnets
-  PrivateSubnet1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      AvailabilityZone: !Select [ 0, !GetAZs '' ]
-      CidrBlock: !Ref PrivateSubnet1CIDR
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: TerraformEnginePrivateSubnet1
-      VpcId: !Ref VPC
-
-  PrivateSubnet2:
-    Condition: MoreThan1AZ
-    Type: AWS::EC2::Subnet
-    Properties:
-      AvailabilityZone: !Select [ 1, !GetAZs '' ]
-      CidrBlock: !Ref PrivateSubnet2CIDR
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: TerraformEnginePrivateSubnet2
-      VpcId: !Ref VPC
-
-  PrivateSubnet3:
-    Condition: MoreThan2AZs
-    Type: AWS::EC2::Subnet
-    Properties:
-      AvailabilityZone: !Select [ 2, !GetAZs '' ]
-      CidrBlock: !Ref PrivateSubnet3CIDR
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: TerraformEnginePrivateSubnet3
-      VpcId: !Ref VPC
-  
-  # Create Private Route Table
-  PrivateRouteTable1:
-    Type: 'AWS::EC2::RouteTable'
-    Properties:
-      Tags:
-        - Key: Name
-          Value: TerraformEnginePrivateRouteTable1
-      VpcId: !Ref VPC
-  
-  PrivateRouteTable2:
-    Condition: MoreThan1AZ
-    Type: 'AWS::EC2::RouteTable'
-    Properties:
-      Tags:
-        - Key: Name
-          Value: TerraformEnginePrivateRouteTable2
-      VpcId: !Ref VPC
-  
-  PrivateRouteTable3:
-    Condition: MoreThan2AZs
-    Type: 'AWS::EC2::RouteTable'
-    Properties:
-      Tags:
-        - Key: Name
-          Value: TerraformEnginePrivateRouteTable3
-      VpcId: !Ref VPC
-
-  # Create Routes in Private Subnet Route Tables
-  PrivateRoute1:
-    Type: 'AWS::EC2::Route'
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable1
-      DestinationCidrBlock: '0.0.0.0/0'
-      NatGatewayId: !Ref NatGatewayFromPublicSubnet1
-      
-  PrivateRoute2:
-    Condition: MoreThan1AZ
-    Type: 'AWS::EC2::Route'
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable2
-      DestinationCidrBlock: '0.0.0.0/0'
-      NatGatewayId: !Ref NatGatewayFromPublicSubnet2
-
-  PrivateRoute3:
-    Condition: MoreThan2AZs
-    Type: 'AWS::EC2::Route'
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable3
-      DestinationCidrBlock: '0.0.0.0/0'
-      NatGatewayId: !Ref NatGatewayFromPublicSubnet3
-      
-  # Associate Private Subnets
-  PrivateRouteTableAssociation1:
-    Type: 'AWS::EC2::SubnetRouteTableAssociation'
-    Properties:
-      SubnetId: !Ref PrivateSubnet1
-      RouteTableId: !Ref PrivateRouteTable1
-  
-  PrivateRouteTableAssociation2:
-    Type: 'AWS::EC2::SubnetRouteTableAssociation'
-    Condition: MoreThan1AZ
-    Properties:
-      SubnetId: !Ref PrivateSubnet2
-      RouteTableId: !Ref PrivateRouteTable2
-      
-  PrivateRouteTableAssociation3:
-    Type: 'AWS::EC2::SubnetRouteTableAssociation'
-    Condition: MoreThan2AZs
-    Properties:
-      SubnetId: !Ref PrivateSubnet3
-      RouteTableId: !Ref PrivateRouteTable3
 
   # Create Security Group
   InstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: SSH (port 22)
-      VpcId: !Ref VPC
+      VpcId: var.VPC_ID
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
@@ -390,7 +71,7 @@ Resources:
   S3GatewayEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
-      VpcId: !Ref VPC
+      VpcId: var.VPC_ID
       VpcEndpointType: Gateway
       PolicyDocument:
         Statement:
@@ -399,7 +80,7 @@ Resources:
           Resource: '*'
           Principal: '*'
       RouteTableIds:
-        - !Ref PublicRouteTable
+        - var.PublicRouteTable_ID
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
 
   LoggingBucket:
@@ -535,44 +216,23 @@ Resources:
         Timeout: PT15M
     Properties:
       AutoScalingGroupName: TerraformAutoscalingGroup
-      AvailabilityZones: !If
-        - MoreThan2AZs
-        - - Fn::Select:
-              - 0
-              - Fn::GetAZs: !Ref 'AWS::Region'
-          - Fn::Select:
-              - 1
-              - Fn::GetAZs: !Ref 'AWS::Region'
-          - Fn::Select:
-              - 2
-              - Fn::GetAZs: !Ref 'AWS::Region'
-        - !If
-          - MoreThan1AZ
-          - - Fn::Select:
-                - 0
-                - Fn::GetAZs: !Ref 'AWS::Region'
-            - Fn::Select:
-                - 1
-                - Fn::GetAZs: !Ref 'AWS::Region'
-          - - Fn::Select:
-                - 0
-                - Fn::GetAZs: !Ref 'AWS::Region'
+      AvailabilityZones: 
+        - Fn::Select:
+            - 0
+            - Fn::GetAZs: !Ref 'AWS::Region'
+        - Fn::Select:
+            - 1
+            - Fn::GetAZs: !Ref 'AWS::Region'
+        - Fn::Select:
+            - 2
+            - Fn::GetAZs: !Ref 'AWS::Region'
       LaunchTemplate:
         LaunchTemplateId: !Ref TerraformAutoScalingLaunchTemplate
         Version: !GetAtt TerraformAutoScalingLaunchTemplate.LatestVersionNumber
       MaxSize: 3
       MinSize: 1
       DesiredCapacity: 1
-      VPCZoneIdentifier: !If
-        - MoreThan2AZs
-        - - !Ref PrivateSubnet1
-          - !Ref PrivateSubnet2
-          - !Ref PrivateSubnet3
-        - !If
-            - MoreThan1AZ
-            - - !Ref PrivateSubnet1
-              - !Ref PrivateSubnet2
-            - - !Ref PrivateSubnet1
+      VPCZoneIdentifier: var.Subnets_ID
       Tags:
         - Key: Name
           Value: TerraformEngineExecutionInstance
@@ -967,18 +627,8 @@ Resources:
       CodeUri: lambda-functions/terraform_open_source_parameter_parser/
       Handler: terraform_open_source_parameter_parser
       VpcConfig:
-        SubnetIds: !If
-          - MoreThan2AZs
-          - - !Ref PrivateSubnet1
-            - !Ref PrivateSubnet2
-            - !Ref PrivateSubnet3
-          - !If
-            - MoreThan1AZ
-            - - !Ref PrivateSubnet1
-              - !Ref PrivateSubnet2
-            - - !Ref PrivateSubnet1
-        SecurityGroupIds:
-          - !GetAtt VPC.DefaultSecurityGroup
+        SubnetIds: var.Subnets_ID
+        #SecurityGroupIds:
       Runtime: go1.x
       Architectures:
         - x86_64
@@ -1185,18 +835,8 @@ Resources:
           - SelectWorkerHostFunctionRole
           - Arn
       VpcConfig:
-        SubnetIds: !If
-          - MoreThan2AZs
-          - - !Ref PrivateSubnet1
-            - !Ref PrivateSubnet2
-            - !Ref PrivateSubnet3
-          - !If
-            - MoreThan1AZ
-            - - !Ref PrivateSubnet1
-              - !Ref PrivateSubnet2
-            - - !Ref PrivateSubnet1
-        SecurityGroupIds:
-          - !GetAtt VPC.DefaultSecurityGroup
+        SubnetIds: var.Subnets_ID
+        #SecurityGroupIds:
       PackageType: Zip
       CodeUri: lambda-functions/state_machine_lambdas
       Handler: select_worker_host.select
@@ -1244,18 +884,8 @@ Resources:
           - GetStateFileOutputsRole
           - Arn
       VpcConfig:
-        SubnetIds: !If
-          - MoreThan2AZs
-          - - !Ref PrivateSubnet1
-            - !Ref PrivateSubnet2
-            - !Ref PrivateSubnet3
-          - !If
-            - MoreThan1AZ
-            - - !Ref PrivateSubnet1
-              - !Ref PrivateSubnet2
-            - - !Ref PrivateSubnet1
-        SecurityGroupIds:
-          - !GetAtt VPC.DefaultSecurityGroup
+        SubnetIds: var.Subnets_ID
+        #SecurityGroupIds:
       PackageType: Zip
       CodeUri: lambda-functions/state_machine_lambdas
       Handler: get_state_file_outputs.parse
@@ -1316,18 +946,8 @@ Resources:
           - PollCommandInvocationFunctionRole
           - Arn
       VpcConfig:
-        SubnetIds: !If
-          - MoreThan2AZs
-          - - !Ref PrivateSubnet1
-            - !Ref PrivateSubnet2
-            - !Ref PrivateSubnet3
-          - !If
-            - MoreThan1AZ
-            - - !Ref PrivateSubnet1
-              - !Ref PrivateSubnet2
-            - - !Ref PrivateSubnet1
-        SecurityGroupIds:
-          - !GetAtt VPC.DefaultSecurityGroup
+        SubnetIds: var.Subnets_ID
+        #SecurityGroupIds:
       PackageType: Zip
       CodeUri: lambda-functions/state_machine_lambdas
       Handler: poll_command_invocation.poll
@@ -1377,18 +997,8 @@ Resources:
       CodeUri: lambda-functions/state_machine_lambdas
       Handler: send_apply_command.send
       VpcConfig:
-        SubnetIds: !If
-          - MoreThan2AZs
-          - - !Ref PrivateSubnet1
-            - !Ref PrivateSubnet2
-            - !Ref PrivateSubnet3
-          - !If
-            - MoreThan1AZ
-            - - !Ref PrivateSubnet1
-              - !Ref PrivateSubnet2
-            - - !Ref PrivateSubnet1
-        SecurityGroupIds:
-          - !GetAtt VPC.DefaultSecurityGroup
+        SubnetIds: var.Subnets_ID
+        #SecurityGroupIds:
       Runtime: python3.9
       Timeout: 60
       Environment:
@@ -1438,18 +1048,8 @@ Resources:
       CodeUri: lambda-functions/state_machine_lambdas
       Handler: notify_provision_result.notify
       VpcConfig:
-        SubnetIds: !If
-          - MoreThan2AZs
-          - - !Ref PrivateSubnet1
-            - !Ref PrivateSubnet2
-            - !Ref PrivateSubnet3
-          - !If
-            - MoreThan1AZ
-            - - !Ref PrivateSubnet1
-              - !Ref PrivateSubnet2
-            - - !Ref PrivateSubnet1
-        SecurityGroupIds:
-          - !GetAtt VPC.DefaultSecurityGroup
+        SubnetIds: var.Subnets_ID
+        #SecurityGroupIds:
       Runtime: python3.9
       Environment:
         Variables:
@@ -1511,18 +1111,8 @@ Resources:
       CodeUri: lambda-functions/state_machine_lambdas
       Handler: notify_update_result.notify
       VpcConfig:
-        SubnetIds: !If
-          - MoreThan2AZs
-          - - !Ref PrivateSubnet1
-            - !Ref PrivateSubnet2
-            - !Ref PrivateSubnet3
-          - !If
-            - MoreThan1AZ
-            - - !Ref PrivateSubnet1
-              - !Ref PrivateSubnet2
-            - - !Ref PrivateSubnet1
-        SecurityGroupIds:
-          - !GetAtt VPC.DefaultSecurityGroup
+        SubnetIds: var.Subnets_ID
+        #SecurityGroupIds:
       Runtime: python3.9
       Environment:
         Variables:
@@ -1584,18 +1174,8 @@ Resources:
       CodeUri: lambda-functions/state_machine_lambdas
       Handler: send_destroy_command.send
       VpcConfig:
-        SubnetIds: !If
-          - MoreThan2AZs
-          - - !Ref PrivateSubnet1
-            - !Ref PrivateSubnet2
-            - !Ref PrivateSubnet3
-          - !If
-            - MoreThan1AZ
-            - - !Ref PrivateSubnet1
-              - !Ref PrivateSubnet2
-            - - !Ref PrivateSubnet1
-        SecurityGroupIds:
-          - !GetAtt VPC.DefaultSecurityGroup
+        SubnetIds: var.Subnets_ID
+        #SecurityGroupIds:
       Runtime: python3.9
       Environment:
         Variables:
@@ -1618,18 +1198,8 @@ Resources:
       CodeUri: lambda-functions/state_machine_lambdas
       Handler: notify_terminate_result.notify
       VpcConfig:
-        SubnetIds: !If
-          - MoreThan2AZs
-          - - !Ref PrivateSubnet1
-            - !Ref PrivateSubnet2
-            - !Ref PrivateSubnet3
-          - !If
-            - MoreThan1AZ
-            - - !Ref PrivateSubnet1
-              - !Ref PrivateSubnet2
-            - - !Ref PrivateSubnet1
-        SecurityGroupIds:
-          - !GetAtt VPC.DefaultSecurityGroup
+        SubnetIds: var.Subnets_ID
+        #SecurityGroupIds:
       Runtime: python3.9
       Environment:
         Variables:
