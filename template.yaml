@@ -25,11 +25,6 @@ Parameters:
     Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
     Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
 
-  
-    Default: 10.0.160.0/19
-    Description: Please enter the IP range (CIDR notation) for the private subnet 3 (not supported in all regions)
-    Type: String
-
   SSHLocation:
     AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
     ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
@@ -39,20 +34,28 @@ Parameters:
     MinLength: 9
     Type: String
 
-  
-    Default: 'true'
-    Type: String
-    AllowedValues:
-      - 'true'
-      - 'false'
-
   ParameterParserLambdaMemorySize:
     Default: 1024
     Description: The memory size configuration for parameter parser lambda in MB
     Type: Number
     MinValue: 128
     MaxValue: 10240
-  
+
+  VpcId:
+   Default     : vpc-08cd1341b8b63ae43
+   description : "The VPC ID used to install the engine."
+   type        : String
+
+PublicRouteTable_ID:
+  Default     : rtb-0896480e430561f32
+  description : "The Route Table ID used in S3 Gateway Endpoints."
+  type        : String
+
+Subnets_ID:
+  description : "A list of subnet IDs to launch resources in. Subnets automatically determine which availability zones the group will reside."
+  type        :  list(string)
+  default     : ["subnet-0acf24df6de072cf9,subnet-02b0b88b1e3ec547f"]
+
 
 Resources:
 
@@ -61,7 +64,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: SSH (port 22)
-      VpcId: var.VPC_ID
+      VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
@@ -71,7 +74,7 @@ Resources:
   S3GatewayEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
-      VpcId: var.VPC_ID
+      VpcId: !Ref VpcId
       VpcEndpointType: Gateway
       PolicyDocument:
         Statement:
@@ -80,7 +83,7 @@ Resources:
           Resource: '*'
           Principal: '*'
       RouteTableIds:
-        - var.PublicRouteTable_ID
+        - !Ref PublicRouteTable_ID
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
 
   LoggingBucket:
@@ -232,7 +235,7 @@ Resources:
       MaxSize: 3
       MinSize: 1
       DesiredCapacity: 1
-      VPCZoneIdentifier: var.Subnets_ID
+      VPCZoneIdentifier: !Ref Subnets_ID
       Tags:
         - Key: Name
           Value: TerraformEngineExecutionInstance
@@ -627,7 +630,7 @@ Resources:
       CodeUri: lambda-functions/terraform_open_source_parameter_parser/
       Handler: terraform_open_source_parameter_parser
       VpcConfig:
-        SubnetIds: var.Subnets_ID
+        SubnetIds: !Ref Subnets_ID
         #SecurityGroupIds:
       Runtime: go1.x
       Architectures:
@@ -835,7 +838,7 @@ Resources:
           - SelectWorkerHostFunctionRole
           - Arn
       VpcConfig:
-        SubnetIds: var.Subnets_ID
+        SubnetIds: !Ref Subnets_ID
         #SecurityGroupIds:
       PackageType: Zip
       CodeUri: lambda-functions/state_machine_lambdas
@@ -884,7 +887,7 @@ Resources:
           - GetStateFileOutputsRole
           - Arn
       VpcConfig:
-        SubnetIds: var.Subnets_ID
+        SubnetIds: !Ref Subnets_ID
         #SecurityGroupIds:
       PackageType: Zip
       CodeUri: lambda-functions/state_machine_lambdas
@@ -946,7 +949,7 @@ Resources:
           - PollCommandInvocationFunctionRole
           - Arn
       VpcConfig:
-        SubnetIds: var.Subnets_ID
+        SubnetIds: !Ref Subnets_ID
         #SecurityGroupIds:
       PackageType: Zip
       CodeUri: lambda-functions/state_machine_lambdas
@@ -997,7 +1000,7 @@ Resources:
       CodeUri: lambda-functions/state_machine_lambdas
       Handler: send_apply_command.send
       VpcConfig:
-        SubnetIds: var.Subnets_ID
+        SubnetIds: !Ref Subnets_ID
         #SecurityGroupIds:
       Runtime: python3.9
       Timeout: 60
@@ -1048,7 +1051,7 @@ Resources:
       CodeUri: lambda-functions/state_machine_lambdas
       Handler: notify_provision_result.notify
       VpcConfig:
-        SubnetIds: var.Subnets_ID
+        SubnetIds: !Ref Subnets_ID
         #SecurityGroupIds:
       Runtime: python3.9
       Environment:
@@ -1111,7 +1114,7 @@ Resources:
       CodeUri: lambda-functions/state_machine_lambdas
       Handler: notify_update_result.notify
       VpcConfig:
-        SubnetIds: var.Subnets_ID
+        SubnetIds: !Ref Subnets_ID
         #SecurityGroupIds:
       Runtime: python3.9
       Environment:
@@ -1174,7 +1177,7 @@ Resources:
       CodeUri: lambda-functions/state_machine_lambdas
       Handler: send_destroy_command.send
       VpcConfig:
-        SubnetIds: var.Subnets_ID
+        SubnetIds: !Ref Subnets_ID
         #SecurityGroupIds:
       Runtime: python3.9
       Environment:
@@ -1198,7 +1201,7 @@ Resources:
       CodeUri: lambda-functions/state_machine_lambdas
       Handler: notify_terminate_result.notify
       VpcConfig:
-        SubnetIds: var.Subnets_ID
+        SubnetIds: !Ref Subnets_ID
         #SecurityGroupIds:
       Runtime: python3.9
       Environment:
