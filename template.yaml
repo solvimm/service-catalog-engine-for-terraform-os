@@ -41,7 +41,7 @@ Parameters:
     MinValue: 128
     MaxValue: 10240
 
-  VpcId:
+VpcId:
    Default     : vpc-08cd1341b8b63ae43
    description : "The VPC ID used to install the engine."
    type        : String
