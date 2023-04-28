@@ -22,8 +22,8 @@ Parameters:
     Type: String
 
   ServerLatestAmiId:
-    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
-    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
 
   SSHLocation:
     AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
@@ -41,24 +41,22 @@ Parameters:
     MinValue: 128
     MaxValue: 10240
 
-VpcId:
-   Default     : vpc-08cd1341b8b63ae43
-   description : "The VPC ID used to install the engine."
-   type        : String
+  VpcId:
+    Default: vpc-08cd1341b8b63ae43
+    Description: "The VPC ID used to install the engine."
+    Type: String
 
-PublicRouteTable_ID:
-  Default     : rtb-0896480e430561f32
-  description : "The Route Table ID used in S3 Gateway Endpoints."
-  type        : String
+  PublicRouteTableID:
+    Default: rtb-0896480e430561f32
+    Description: "The Route Table ID used in S3 Gateway Endpoints."
+    Type: String
 
-Subnets_ID:
-  description : "A list of subnet IDs to launch resources in. Subnets automatically determine which availability zones the group will reside."
-  type        :  list(string)
-  default     : ["subnet-0acf24df6de072cf9,subnet-02b0b88b1e3ec547f"]
-
+  SubnetsID:
+    Description: "A list of subnet IDs to launch resources in. Subnets automatically determine which availability zones the group will reside."
+    Type: List<AWS::EC2::Subnet::Id>
+    Default: subnet-0acf24df6de072cf9,subnet-02b0b88b1e3ec547f
 
 Resources:
-
   # Create Security Group
   InstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -80,22 +78,22 @@ Resources:
         Statement:
           Effect: Allow
           Action: s3:*
-          Resource: '*'
-          Principal: '*'
+          Resource: "*"
+          Principal: "*"
       RouteTableIds:
-        - !Ref PublicRouteTable_ID
-      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+        - !Ref PublicRouteTableID
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
 
   LoggingBucket:
-    Type: 'AWS::S3::Bucket'
+    Type: "AWS::S3::Bucket"
     Properties:
-      BucketName: !Sub 'sc-terraform-engine-logging-${AWS::AccountId}-${AWS::Region}'
+      BucketName: !Sub "sc-terraform-engine-logging-${AWS::AccountId}-${AWS::Region}"
       VersioningConfiguration:
         Status: Enabled
       BucketEncryption:
         ServerSideEncryptionConfiguration:
-        - ServerSideEncryptionByDefault:
-            SSEAlgorithm: AES256
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
 
   LoggingBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -106,17 +104,13 @@ Resources:
           - Action: "s3:PutObject"
             Effect: Allow
             Principal:
-              Service:
-                logging.s3.amazonaws.com
-            Resource:
-              !Sub ${LoggingBucket.Arn}/*
+              Service: logging.s3.amazonaws.com
+            Resource: !Sub ${LoggingBucket.Arn}/*
             Condition:
               ArnLike:
-                "aws:SourceArn":
-                  !GetAtt TerraformStateBucket.Arn
+                "aws:SourceArn": !GetAtt TerraformStateBucket.Arn
               StringEquals:
-                "aws:SourceAccount":
-                  !Sub "${AWS::AccountId}"
+                "aws:SourceAccount": !Sub "${AWS::AccountId}"
 
   # Bucket for the Terraform S3 backend where state files are stored.
   # This bucket name is used when overriding the Terraform backend.
@@ -124,21 +118,21 @@ Resources:
   TerraformStateBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'sc-terraform-engine-state-${AWS::AccountId}-${AWS::Region}'
+      BucketName: !Sub "sc-terraform-engine-state-${AWS::AccountId}-${AWS::Region}"
       AccessControl: Private
       VersioningConfiguration:
         Status: Enabled
       BucketEncryption:
         ServerSideEncryptionConfiguration:
-        - ServerSideEncryptionByDefault:
-            SSEAlgorithm: aws:kms
-            KMSMasterKeyID: !Ref TerraformStateBucketKey
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref TerraformStateBucketKey
       LoggingConfiguration:
         DestinationBucketName: !Ref LoggingBucket
         LogFilePrefix: sc-terraform-engine-state/log
 
   TerraformStateBucketKey:
-    Type: 'AWS::KMS::Key'
+    Type: "AWS::KMS::Key"
     Properties:
       Description: A symmetric encryption KMS key for TerraformStateBucket
       EnableKeyRotation: true
@@ -152,7 +146,7 @@ Resources:
               AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root
             Action:
               - "kms:*"
-            Resource: '*'
+            Resource: "*"
       Tags:
         - Key: Name
           Value: TerraformStateBucketKey
@@ -219,23 +213,23 @@ Resources:
         Timeout: PT15M
     Properties:
       AutoScalingGroupName: TerraformAutoscalingGroup
-      AvailabilityZones: 
+      AvailabilityZones:
         - Fn::Select:
             - 0
-            - Fn::GetAZs: !Ref 'AWS::Region'
+            - Fn::GetAZs: !Ref "AWS::Region"
         - Fn::Select:
             - 1
-            - Fn::GetAZs: !Ref 'AWS::Region'
+            - Fn::GetAZs: !Ref "AWS::Region"
         - Fn::Select:
             - 2
-            - Fn::GetAZs: !Ref 'AWS::Region'
+            - Fn::GetAZs: !Ref "AWS::Region"
       LaunchTemplate:
         LaunchTemplateId: !Ref TerraformAutoScalingLaunchTemplate
         Version: !GetAtt TerraformAutoScalingLaunchTemplate.LatestVersionNumber
       MaxSize: 3
       MinSize: 1
       DesiredCapacity: 1
-      VPCZoneIdentifier: !Ref Subnets_ID
+      VPCZoneIdentifier: !Ref SubnetsID
       Tags:
         - Key: Name
           Value: TerraformEngineExecutionInstance
@@ -259,8 +253,7 @@ Resources:
         MetadataOptions:
           HttpTokens: required
         UserData:
-          Fn::Base64:
-            !Sub |
+          Fn::Base64: !Sub |
             #!/bin/bash -xe
             yum update -y aws-cfn-bootstrap
             /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource TerraformAutoScalingLaunchTemplate --configsets setup --region ${AWS::Region}
@@ -277,40 +270,37 @@ Resources:
         install_terraform:
           packages:
             yum:
-              yum-utils: [ ]
+              yum-utils: []
           commands:
             add_hashicorp_repo_to_yum:
-              command:
-                sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
+              command: sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
             install_terraform_cli_package:
-              command:
-                !Sub sudo yum -y install terraform-${TerraformCliVersion}
+              command: !Sub sudo yum -y install terraform-${TerraformCliVersion}
 
         install_boto3:
           commands:
             01_pip_install:
-              command: 'pip3 install boto3'
+              command: "pip3 install boto3"
 
         install_terraform_runner:
           packages:
             yum:
-              jq: [ ]
-              git: [ ]
+              jq: []
+              git: []
           commands:
             01_download_wheel:
-              command: 
-                !Sub
-                  - 'aws s3 cp s3://${BootstrapBucketName}/dist/terraform_runner-0.1-py3-none-any.whl /tmp/terraform_runner-0.1-py3-none-any.whl --region ${AWS::Region}'
-                  - BootstrapBucketName: !ImportValue TerraformEngineBootstrapBucketName
+              command: !Sub
+                - "aws s3 cp s3://${BootstrapBucketName}/dist/terraform_runner-0.1-py3-none-any.whl /tmp/terraform_runner-0.1-py3-none-any.whl --region ${AWS::Region}"
+                - BootstrapBucketName: !ImportValue TerraformEngineBootstrapBucketName
             02_install_wheel:
-              command: 'pip3 install /tmp/terraform_runner-0.1-py3-none-any.whl'
+              command: "pip3 install /tmp/terraform_runner-0.1-py3-none-any.whl"
 
         create_workspaces_parent_dir:
           commands:
             01_make_directory:
-              command: 'mkdir -p /home/ec2-user/workspaces'
+              command: "mkdir -p /home/ec2-user/workspaces"
             02_change_directory_owner:
-              command: 'chown ec2-user:ec2-user /home/ec2-user/workspaces'
+              command: "chown ec2-user:ec2-user /home/ec2-user/workspaces"
 
   # Role for running Terraform on an instance.
   # Here we establish the convention that launch role names must always start with "SCLaunch*"
@@ -320,7 +310,7 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       Path: /TerraformEngine/
-      RoleName: !Sub 'TerraformExecutionRole-${AWS::Region}'
+      RoleName: !Sub "TerraformExecutionRole-${AWS::Region}"
       AssumeRolePolicyDocument:
         Statement:
           - Effect: Allow
@@ -342,9 +332,9 @@ Resources:
                   - s3:PutObject
                 Resource:
                   - !Sub ${TerraformStateBucket.Arn}/*
-                  - !Sub 
-                      - '${BootstrapBucketArn}/*'
-                      - BootstrapBucketArn: !ImportValue TerraformEngineBootstrapBucketArn
+                  - !Sub
+                    - "${BootstrapBucketArn}/*"
+                    - BootstrapBucketArn: !ImportValue TerraformEngineBootstrapBucketArn
         - PolicyName: KMSAccessPolicyForStateBucket
           PolicyDocument:
             Statement:
@@ -372,7 +362,7 @@ Resources:
         - !Ref TerraformAutoscalingGroupRole
 
   QueueKey:
-    Type: 'AWS::KMS::Key'
+    Type: "AWS::KMS::Key"
     Properties:
       Description: A symmetric encryption KMS key for SQS queues
       EnableKeyRotation: true
@@ -387,17 +377,17 @@ Resources:
               AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root
             Action:
               - "kms:*"
-            Resource: '*'
+            Resource: "*"
           - Sid: Enable AWS Service Catalog to send messages
             Effect: Allow
             Principal:
-              Service: 'servicecatalog.amazonaws.com'
+              Service: "servicecatalog.amazonaws.com"
             Action:
               - kms:DescribeKey
               - kms:Decrypt
               - kms:ReEncrypt
               - kms:GenerateDataKey
-            Resource: '*'
+            Resource: "*"
       Tags:
         - Key: Name
           Value: TerraformEngineSQSEncryptionKey
@@ -543,7 +533,7 @@ Resources:
       Enabled: true
       EventSourceArn: !GetAtt TerraformEngineProvisioningQueue.Arn
       FunctionName: !GetAtt TerraformEngineProvisioningHandlerLambda.Arn
-      FunctionResponseTypes: [ ReportBatchItemFailures ]
+      FunctionResponseTypes: [ReportBatchItemFailures]
 
   TerraformEngineUpdateQueueLambdaEventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping
@@ -552,7 +542,7 @@ Resources:
       Enabled: true
       EventSourceArn: !GetAtt TerraformEngineUpdateQueue.Arn
       FunctionName: !GetAtt TerraformEngineProvisioningHandlerLambda.Arn
-      FunctionResponseTypes: [ ReportBatchItemFailures ]
+      FunctionResponseTypes: [ReportBatchItemFailures]
 
   TerraformEngineTerminateHandlerLambda:
     Type: AWS::Serverless::Function
@@ -621,7 +611,7 @@ Resources:
       Enabled: true
       EventSourceArn: !GetAtt TerraformEngineTerminateQueue.Arn
       FunctionName: !GetAtt TerraformEngineTerminateHandlerLambda.Arn
-      FunctionResponseTypes: [ ReportBatchItemFailures ]
+      FunctionResponseTypes: [ReportBatchItemFailures]
 
   ParameterParser:
     Type: AWS::Serverless::Function
@@ -630,7 +620,7 @@ Resources:
       CodeUri: lambda-functions/terraform_open_source_parameter_parser/
       Handler: terraform_open_source_parameter_parser
       VpcConfig:
-        SubnetIds: !Ref Subnets_ID
+        SubnetIds: !Ref SubnetsID
         #SecurityGroupIds:
       Runtime: go1.x
       Architectures:
@@ -646,25 +636,25 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       Path: /TerraformEngine/
-      RoleName: !Sub 'ServiceCatalogTerraformOSParameterParserRole-${AWS::Region}'
+      RoleName: !Sub "ServiceCatalogTerraformOSParameterParserRole-${AWS::Region}"
       ManagedPolicyArns:
         - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
       Policies:
         - PolicyDocument:
             Statement:
-              - Action: [ 'sts:AssumeRole' ]
+              - Action: ["sts:AssumeRole"]
                 Effect: Allow
                 Resource: !Sub "arn:${AWS::Partition}:iam::*:role/SCLaunch*"
-            Version: '2012-10-17'
+            Version: "2012-10-17"
           PolicyName: lambdaPermissions
       AssumeRolePolicyDocument:
         Statement:
-          - Action: [ 'sts:AssumeRole' ]
+          - Action: ["sts:AssumeRole"]
             Effect: Allow
             Principal:
-              Service: [ lambda.amazonaws.com ]
-        Version: '2012-10-17'
+              Service: [lambda.amazonaws.com]
+        Version: "2012-10-17"
 
   ParameterParserPermission:
     Type: AWS::Lambda::Permission
@@ -694,7 +684,7 @@ Resources:
         GetStateFileOutputsFunctionArn: !GetAtt GetStateFileOutputsFunction.Arn
         NotifyProvisionResultFunctionArn: !GetAtt NotifyProvisionResultFunction.Arn
         NotifyUpdateResultFunctionArn: !GetAtt NotifyUpdateResultFunction.Arn
-        LambdaInvokeArn: !Sub 'arn:${AWS::Partition}:states:::lambda:invoke'
+        LambdaInvokeArn: !Sub "arn:${AWS::Partition}:states:::lambda:invoke"
 
   ManageProvisionedProductStateMachineRole:
     Type: AWS::IAM::Role
@@ -704,7 +694,7 @@ Resources:
       Policies:
         - PolicyName: Cloudwatch_Permissions
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Action:
                   - logs:CreateLogDelivery
@@ -719,10 +709,10 @@ Resources:
                 Effect: Allow
                 # An internal AWS bug prevents us from scoping down the resource here.
                 # https://repost.aws/questions/QURc2glxBETSe3Q6Y0UwcpQg/bug-with-logging-configuration
-                Resource: '*'
+                Resource: "*"
         - PolicyName: Lambda_Invocation_Permissions
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Action:
                   - lambda:InvokeFunction
@@ -735,7 +725,7 @@ Resources:
                   - !GetAtt NotifyProvisionResultFunction.Arn
                   - !GetAtt NotifyUpdateResultFunction.Arn
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Action:
               - sts:AssumeRole
@@ -770,7 +760,7 @@ Resources:
         SendDestroyCommandFunctionArn: !GetAtt SendDestroyCommandFunction.Arn
         PollCommandInvocationFunctionArn: !GetAtt PollCommandInvocationFunction.Arn
         NotifyTerminateResultFunctionArn: !GetAtt NotifyTerminateResultFunction.Arn
-        LambdaInvokeArn: !Sub 'arn:${AWS::Partition}:states:::lambda:invoke'
+        LambdaInvokeArn: !Sub "arn:${AWS::Partition}:states:::lambda:invoke"
 
   TerminateProvisionedProductStateMachineRole:
     Type: AWS::IAM::Role
@@ -780,7 +770,7 @@ Resources:
       Policies:
         - PolicyName: Cloudwatch_Permissions
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Action:
                   - logs:CreateLogDelivery
@@ -795,10 +785,10 @@ Resources:
                 Effect: Allow
                 # An internal AWS bug prevents us from scoping down the resource here.
                 # https://repost.aws/questions/QURc2glxBETSe3Q6Y0UwcpQg/bug-with-logging-configuration
-                Resource: '*'
+                Resource: "*"
         - PolicyName: Lambda_Invocation_Permissions
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Action:
                   - lambda:InvokeFunction
@@ -809,7 +799,7 @@ Resources:
                   - !GetAtt PollCommandInvocationFunction.Arn
                   - !GetAtt NotifyTerminateResultFunction.Arn
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Action:
               - sts:AssumeRole
@@ -829,8 +819,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: SelectWorkerHostFunction
-      Description:
-        >
+      Description: >
         Lambda function that randomly selects an EC2 host in an Auto-scaling group to
         perform the Terraform workload
       Role:
@@ -838,7 +827,7 @@ Resources:
           - SelectWorkerHostFunctionRole
           - Arn
       VpcConfig:
-        SubnetIds: !Ref Subnets_ID
+        SubnetIds: !Ref SubnetsID
         #SecurityGroupIds:
       PackageType: Zip
       CodeUri: lambda-functions/state_machine_lambdas
@@ -861,8 +850,8 @@ Resources:
               - Action:
                   - ec2:DescribeInstances
                 Effect: Allow
-                Resource: '*'
-            Version: '2012-10-17'
+                Resource: "*"
+            Version: "2012-10-17"
           PolicyName: lambdaPermissions
       AssumeRolePolicyDocument:
         Statement:
@@ -872,14 +861,13 @@ Resources:
             Principal:
               Service:
                 - lambda.amazonaws.com
-        Version: '2012-10-17'
+        Version: "2012-10-17"
 
   GetStateFileOutputsFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: GetStateFileOutputsFunction
-      Description:
-        >
+      Description: >
         Lambda function that parses state file JSON from S3 state bucket
         to fetch record outputs
       Role:
@@ -887,7 +875,7 @@ Resources:
           - GetStateFileOutputsRole
           - Arn
       VpcConfig:
-        SubnetIds: !Ref Subnets_ID
+        SubnetIds: !Ref SubnetsID
         #SecurityGroupIds:
       PackageType: Zip
       CodeUri: lambda-functions/state_machine_lambdas
@@ -911,10 +899,10 @@ Resources:
         - PolicyName: S3StateFileReadPermissions
           PolicyDocument:
             Statement:
-              - Action: [ 's3:GetObject' ]
+              - Action: ["s3:GetObject"]
                 Effect: Allow
                 Resource: !Sub ${TerraformStateBucket.Arn}/*
-            Version: '2012-10-17'
+            Version: "2012-10-17"
         - PolicyName: KMSAccessPolicyForStateBucket
           PolicyDocument:
             Statement:
@@ -934,14 +922,13 @@ Resources:
             Principal:
               Service:
                 - lambda.amazonaws.com
-        Version: '2012-10-17'
+        Version: "2012-10-17"
 
   PollCommandInvocationFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: PollCommandInvocationFunction
-      Description:
-        >
+      Description: >
         Lambda function that polls the status of a command invocation
         in a selected EC2 instance
       Role:
@@ -949,7 +936,7 @@ Resources:
           - PollCommandInvocationFunctionRole
           - Arn
       VpcConfig:
-        SubnetIds: !Ref Subnets_ID
+        SubnetIds: !Ref SubnetsID
         #SecurityGroupIds:
       PackageType: Zip
       CodeUri: lambda-functions/state_machine_lambdas
@@ -972,8 +959,8 @@ Resources:
               - Action:
                   - ssm:GetCommandInvocation
                 Effect: Allow
-                Resource: '*'
-            Version: '2012-10-17'
+                Resource: "*"
+            Version: "2012-10-17"
           PolicyName: lambdaPermissions
       AssumeRolePolicyDocument:
         Statement:
@@ -983,14 +970,13 @@ Resources:
             Principal:
               Service:
                 - lambda.amazonaws.com
-        Version: '2012-10-17'
+        Version: "2012-10-17"
 
   SendApplyCommandFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: SendApplyCommandFunction
-      Description:
-        >
+      Description: >
         Lambda function that creates the CLI command to provision a product and runs it on an instance through SSM
       Role:
         Fn::GetAtt:
@@ -1000,7 +986,7 @@ Resources:
       CodeUri: lambda-functions/state_machine_lambdas
       Handler: send_apply_command.send
       VpcConfig:
-        SubnetIds: !Ref Subnets_ID
+        SubnetIds: !Ref SubnetsID
         #SecurityGroupIds:
       Runtime: python3.9
       Timeout: 60
@@ -1023,8 +1009,8 @@ Resources:
               - Action:
                   - ssm:SendCommand
                 Effect: Allow
-                Resource: '*'
-            Version: '2012-10-17'
+                Resource: "*"
+            Version: "2012-10-17"
           PolicyName: lambdaPermissions
       AssumeRolePolicyDocument:
         Statement:
@@ -1034,14 +1020,13 @@ Resources:
             Principal:
               Service:
                 - lambda.amazonaws.com
-        Version: '2012-10-17'
+        Version: "2012-10-17"
 
   NotifyProvisionResultFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: NotifyProvisionResult
-      Description:
-        >
+      Description: >
         Lambda function that notifies Service Catalog of the provisioning results of this Engine
       Role:
         Fn::GetAtt:
@@ -1051,7 +1036,7 @@ Resources:
       CodeUri: lambda-functions/state_machine_lambdas
       Handler: notify_provision_result.notify
       VpcConfig:
-        SubnetIds: !Ref Subnets_ID
+        SubnetIds: !Ref SubnetsID
         #SecurityGroupIds:
       Runtime: python3.9
       Environment:
@@ -1075,8 +1060,8 @@ Resources:
               - Action:
                   - servicecatalog:NotifyProvisionProductEngineWorkflowResult
                 Effect: Allow
-                Resource: '*'
-            Version: '2012-10-17'
+                Resource: "*"
+            Version: "2012-10-17"
           PolicyName: lambdaPermissions
         - PolicyDocument: # This permission is temporary until NotifyProvisionProductEngineWorkflowResult goes GA
             Statement:
@@ -1084,10 +1069,10 @@ Resources:
                   - s3:GetObject
                 Effect: Allow
                 Resource:
-                  - !Sub 
-                      - '${BootstrapBucketArn}/*'
-                      - BootstrapBucketArn: !ImportValue TerraformEngineBootstrapBucketArn
-            Version: '2012-10-17'
+                  - !Sub
+                    - "${BootstrapBucketArn}/*"
+                    - BootstrapBucketArn: !ImportValue TerraformEngineBootstrapBucketArn
+            Version: "2012-10-17"
           PolicyName: temporary-s3-permissions
       AssumeRolePolicyDocument:
         Statement:
@@ -1097,14 +1082,13 @@ Resources:
             Principal:
               Service:
                 - lambda.amazonaws.com
-        Version: '2012-10-17'
+        Version: "2012-10-17"
 
   NotifyUpdateResultFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: NotifyUpdateResult
-      Description:
-        >
+      Description: >
         Lambda function that notifies Service Catalog of the update results of this Engine
       Role:
         Fn::GetAtt:
@@ -1114,7 +1098,7 @@ Resources:
       CodeUri: lambda-functions/state_machine_lambdas
       Handler: notify_update_result.notify
       VpcConfig:
-        SubnetIds: !Ref Subnets_ID
+        SubnetIds: !Ref SubnetsID
         #SecurityGroupIds:
       Runtime: python3.9
       Environment:
@@ -1124,7 +1108,7 @@ Resources:
       Timeout: 300
       Architectures:
         - x86_64
-        
+
   NotifyUpdateResultFunctionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -1138,8 +1122,8 @@ Resources:
               - Action:
                   - servicecatalog:NotifyUpdateProvisionedProductEngineWorkflowResult
                 Effect: Allow
-                Resource: '*'
-            Version: '2012-10-17'
+                Resource: "*"
+            Version: "2012-10-17"
           PolicyName: lambdaPermissions
         - PolicyDocument: # This permission is temporary until NotifyUpdateProvisionedProductEngineWorkflowResult goes GA
             Statement:
@@ -1148,9 +1132,9 @@ Resources:
                 Effect: Allow
                 Resource:
                   - !Sub
-                    - '${BootstrapBucketArn}/*'
+                    - "${BootstrapBucketArn}/*"
                     - BootstrapBucketArn: !ImportValue TerraformEngineBootstrapBucketArn
-            Version: '2012-10-17'
+            Version: "2012-10-17"
           PolicyName: temporary-s3-permissions
       AssumeRolePolicyDocument:
         Statement:
@@ -1160,14 +1144,13 @@ Resources:
             Principal:
               Service:
                 - lambda.amazonaws.com
-        Version: '2012-10-17'
+        Version: "2012-10-17"
 
   SendDestroyCommandFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: SendDestroyCommandFunction
-      Description:
-        >
+      Description: >
         Lambda function that creates the CLI command to terminate a provisioned product and runs it on an instance through SSM
       Role:
         Fn::GetAtt:
@@ -1177,7 +1160,7 @@ Resources:
       CodeUri: lambda-functions/state_machine_lambdas
       Handler: send_destroy_command.send
       VpcConfig:
-        SubnetIds: !Ref Subnets_ID
+        SubnetIds: !Ref SubnetsID
         #SecurityGroupIds:
       Runtime: python3.9
       Environment:
@@ -1190,8 +1173,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: NotifyTerminateResult
-      Description:
-        >
+      Description: >
         Lambda function that notifies Service Catalog of the terminate results of this Engine
       Role:
         Fn::GetAtt:
@@ -1201,7 +1183,7 @@ Resources:
       CodeUri: lambda-functions/state_machine_lambdas
       Handler: notify_terminate_result.notify
       VpcConfig:
-        SubnetIds: !Ref Subnets_ID
+        SubnetIds: !Ref SubnetsID
         #SecurityGroupIds:
       Runtime: python3.9
       Environment:
@@ -1225,8 +1207,8 @@ Resources:
               - Action:
                   - servicecatalog:NotifyTerminateProvisionedProductEngineWorkflowResult
                 Effect: Allow
-                Resource: '*'
-            Version: '2012-10-17'
+                Resource: "*"
+            Version: "2012-10-17"
           PolicyName: lambdaPermissions
         - PolicyDocument: # This permission is temporary until NotifyTerminateProvisionedProductEngineWorkflowResult goes GA
             Statement:
@@ -1234,10 +1216,10 @@ Resources:
                   - s3:GetObject
                 Effect: Allow
                 Resource:
-                  - !Sub 
-                      - '${BootstrapBucketArn}/*'
-                      - BootstrapBucketArn: !ImportValue TerraformEngineBootstrapBucketArn
-            Version: '2012-10-17'
+                  - !Sub
+                    - "${BootstrapBucketArn}/*"
+                    - BootstrapBucketArn: !ImportValue TerraformEngineBootstrapBucketArn
+            Version: "2012-10-17"
           PolicyName: temporary-s3-permissions
       AssumeRolePolicyDocument:
         Statement:
@@ -1247,5 +1229,4 @@ Resources:
             Principal:
               Service:
                 - lambda.amazonaws.com
-        Version: '2012-10-17'
-
+        Version: "2012-10-17"
