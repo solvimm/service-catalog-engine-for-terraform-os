@@ -152,15 +152,6 @@ Resources:
       Bucket: !Ref TerraformStateBucket
       PolicyDocument:
         Statement:
-          - Sid: DenyInsecureCommunications
-            Action: s3:*
-            Effect: Deny
-            Principal: "*"
-            Resource:
-              - !Sub ${TerraformStateBucket.Arn}/*
-              - !Sub ${TerraformStateBucket.Arn}
-            Condition:
-              Bool: { "aws:SecureTransport": false }
           - Sid: AllowReadOnlyS3AccessForDesignatedRole
             Action: s3:GetObject
             Effect: Allow
@@ -187,13 +178,6 @@ Resources:
                 aws:PrincipalArn:
                   - !GetAtt GetStateFileOutputsRole.Arn
                   - !GetAtt TerraformAutoscalingGroupRole.Arn
-            Resource:
-              - !Sub ${TerraformStateBucket.Arn}/*
-          - Sid: DenyAccessToPublicEndpoint
-            Action: s3:*
-            Effect: Deny
-            Principal:
-              AWS: "*"
             Resource:
               - !Sub ${TerraformStateBucket.Arn}/*
 
